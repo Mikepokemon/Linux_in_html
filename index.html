@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Terminal</title>
+    <style>
+        html, body { height: 100%; }
+        body {
+            min-height: 100vh;
+            background: radial-gradient(circle, #24243e 0%, #302b63 60%, #0f0c29 100%);
+            color: #eee;
+            font-family: 'Fira Mono', 'Courier New', Courier, monospace;
+            margin: 0; box-sizing: border-box;
+            display: flex; flex-direction: column;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .terminal {
+            margin: 40px auto 0 auto;
+            background: rgba(22, 24, 44, 0.96);
+            border-radius: 12px;
+            max-width: 700px;
+            width: 95vw;
+            padding: 36px 30px 28px 30px;
+            display: flex; flex-direction: column;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .output {
+            border-radius: 7px;
+            background: #191921;
+            border: 1.5px solid #343659;
+            height: 380px;
+            min-height: 140px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            padding: 18px;
+            word-break: break-word;
+            -webkit-overflow-scrolling: touch;
+        }
+        .input-group { display: flex; width: 100%; gap: 0.5em; }
+        #commandInput {
+            flex: 1;
+            padding: 13px 12px;
+            border: none; border-radius: 6px;
+            background-color: #21223b; color: #fff;
+            font-size: 1.08rem; outline: none;
+            transition: box-shadow 0.2s;
+            min-width: 0;
+            touch-action: manipulation;
+        }
+        #commandInput:focus { box-shadow: 0 2px 8px 0 #10ff7c22; }
+        #executeBtn {
+            padding: 12px 22px;
+            background: linear-gradient(135deg, #24ff72, #1e5ded);
+            color: #fff; font-weight: 800; border: none; border-radius: 6px;
+            cursor: pointer; font-size: 1.03rem; box-shadow: 0 2px 7px #2245d944;
+            transition: background .21s;
+            user-select: none;
+            min-width: 90px;
+        }
+        #executeBtn:active,
+        #executeBtn:focus { outline: 2px solid #62e4ab55; }
+        #executeBtn:hover { background: linear-gradient(135deg, #62e4ab, #7288ed);}
+        .prompt {
+            color: #1efb5b;
+            text-shadow: 0 0 3px #23f4cd, 0 0 8px #1efb5b;
+            font-weight: 700;
+        }
+        .command { color: #ffe767; }
+        .output-text { color: #F4FCFA; letter-spacing: 0.01em; }
+        .error {
+            color: #ff5252;
+            text-shadow: 0px 0px 2px #ff525221;
+        }
+        .history-item {
+            color: #7190fa;
+            margin: 0 0 3px 0;
+            white-space: pre;
+            padding-left: 2px;
+            border-left: 2px solid #17ff9c;
+            background: linear-gradient(90deg,#34406b11,#0000 90%);
+        }
+        .nano-modal {
+            position: fixed; left: 0; top: 0; width: 100vw; height: 100vh;
+            background: rgba(20,22,27,0.91);
+            z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .nano-editor {
+            background: #171b27;
+            border-radius: 11px;
+            box-shadow: 0 8px 32px #22224477;
+            padding: 26px 20px 18px 20px;
+            min-width: 340px; max-width: 93vw;
+            display: flex; flex-direction: column; align-items: stretch;
+        }
+        .nano-editor label {
+            color: #4cffb6;
+            font-size: 1.12em;
+            margin-bottom: 9px;
+        }
+        .nano-editor textarea {
+            font-size: 1.04em;
+            width: 100%;
+            min-width: 0; max-width: 91vw;
+            min-height: 110px; max-height: 52vh;
+            font-family: 'Fira Mono', 'Courier New', monospace;
+            border-radius: 7px;
+            border: 1.1px solid #2bfcbc44;
+            background: #192235;
+            color: #fff;
+            margin-bottom: 13px;
+            padding: 14px 10px;
+            resize: vertical;
+            -webkit-overflow-scrolling: touch;
+            box-sizing: border-box;
+        }
+        .nano-toolbar { display: flex; gap: 14px; justify-content: flex-end;}
+        .nano-toolbar button {
+            font-size: 1em;
+            padding: 9px 23px; margin-left: 2px;
+            border-radius: 5px; outline: none; border: none; cursor: pointer;
+            font-family: inherit; font-weight: 600; background: linear-gradient(100deg,#47ec99,#217eff);
+            color: #fff; transition: background .18s;
+            user-select: none;
+            min-width: 85px;
+        }
+        .nano-toolbar button.cancel-btn { background: linear-gradient(100deg,#e35764,#585f6f);}
+        @media (max-width:600px) {
+            .terminal { padding: 11px 2vw 8px 2vw; font-size: 0.96rem; margin-top: 5vw;}
+            .output {
+                height: 52vw; min-height: 90px; font-size: 0.98rem;
+                padding: 8px 4px 12px 8px;
+            }
+            .nano-editor { min-width: 90vw; max-width: 97vw; }
+            .nano-editor textarea { max-width: 99vw; min-width: 0; min-height: 100px;}
+            .nano-toolbar button { font-size: 1.01em; padding: 9px 18px;}
+            #executeBtn { min-width: 65px; padding: 10px 12px; font-size: 0.97rem;}
+            #commandInput { font-size: 0.98rem; padding: 11px 8px;}
+        }
+        @media (max-width:400px) {
+            .nano-editor { min-width: 99vw; }
+            .nano-editor textarea { max-width: 99vw; font-size: 0.94rem;}
+        }
+        @media (max-width: 800px) {
+            .nano-modal { align-items: flex-start; padding-top: 7vw;}
+        }
+    </style>
+</head>
+<body>
+<div class="terminal">
+    <div class="output" id="output"></div>
+    <div class="input-group">
+        <input type="text" id="commandInput" placeholder="Enter command..." autocomplete="off" spellcheck="false">
+        <button id="executeBtn" tabindex="0">Execute</button>
+    </div>
+</div>
+<div id="nanoModal" class="nano-modal" style="display:none;">
+    <form class="nano-editor" id="nanoForm" autocomplete="off">
+        <label id="nanoFilename"></label>
+        <textarea id="nanoTextarea"></textarea>
+        <div class="nano-toolbar">
+            <button type="submit">Save</button>
+            <button type="button" class="cancel-btn" id="nanoCancelBtn">Cancel</button>
+        </div>
+    </form>
+</div>
+<script>
+function normalizePath(parts) {
+    const filtered = parts.filter(p => p && p !== '');
+    return '/' + filtered.join('/');
+}
+function getCurrentPath() { return normalizePath(currentDir); }
+let outputDiv = document.getElementById('output');
+let commandInput = document.getElementById('commandInput');
+let executeBtn = document.getElementById('executeBtn');
+let fileSystem = {};
+let currentDir = [];
+let history = [];
+let historyIndex = 0;
+let currentUser = 'user';
+let nanoModal = document.getElementById('nanoModal');
+let nanoForm = document.getElementById('nanoForm');
+let nanoTextarea = document.getElementById('nanoTextarea');
+let nanoFilename = document.getElementById('nanoFilename');
+let nanoCancelBtn = document.getElementById('nanoCancelBtn');
+let nanoEditingPath = null, nanoEditingFile = null;
+
+function createBaseFilesystem() {
+    if (Object.keys(fileSystem).length <= 1) {
+        let standardDirs = [
+            '/bin','/boot','/dev','/etc','/home','/lib','/media','/mnt','/opt','/proc',
+            '/root','/run','/sbin','/srv','/sys','/tmp','/usr','/usr/bin','/usr/lib','/usr/local','/usr/share','/var'
+        ];
+        for(const d of standardDirs){ fileSystem[d] = {}; }
+        fileSystem['/home/user'] = {};
+        fileSystem['/root'] = {};
+    }
+    if (!fileSystem['/']) fileSystem['/'] = {};
+}
+function setUserHomeDir() {
+    const homedir = '/home/' + currentUser;
+    if (fileSystem[homedir] && typeof fileSystem[homedir] === 'object') {
+        currentDir = ['home', currentUser];
+    } else {
+        currentDir = [];
+    }
+}
+function initFileSystem() {
+    const savedSystem = localStorage.getItem('webTerminalFS');
+    const savedHistory = localStorage.getItem('webTerminalHistory');
+    const savedUser = localStorage.getItem('webTerminalUser');
+    if (savedSystem) fileSystem = JSON.parse(savedSystem);
+    if (savedHistory) history = JSON.parse(savedHistory);
+    if (savedUser) currentUser = savedUser;
+    if (!fileSystem['/'] || typeof fileSystem['/'] !== 'object') fileSystem['/'] = {};
+}
+function saveFileSystem() {
+    localStorage.setItem('webTerminalFS', JSON.stringify(fileSystem));
+    localStorage.setItem('webTerminalHistory', JSON.stringify(history));
+    localStorage.setItem('webTerminalUser', currentUser);
+}
+function updatePrompt() {
+    outputDiv.innerHTML += `<div><span class="prompt">${currentUser}@web-terminal:${getCurrentPath()}</span> </div>`;
+    scrollToBottom();
+}
+function scrollToBottom() {
+    setTimeout(() => { outputDiv.scrollTop = outputDiv.scrollHeight; }, 0);
+}
+function ensureDir(path) { if (!fileSystem[path]) fileSystem[path] = {}; }
+function listDir(path) {
+    let result = {};
+    for (let k in fileSystem) {
+        if (k === path) continue;
+        if (!k.startsWith(path === '/' ? '/' : path + '/')) continue;
+        let rel = k.slice((path === '/' ? 1 : path.length + 1));
+        if (rel === '' || rel.includes('/')) continue;
+        result[rel] = typeof fileSystem[k];
+    }
+    return result;
+}
+function processCommand(command) {
+    let cmdParts = command.trim().split(/\s+/);
+    let cmd = cmdParts[0];
+    let args = cmdParts.slice(1);
+    switch (cmd) {
+        case 'ls': ls(); break;
+        case 'pwd': pwd(); break;
+        case 'cd': cd(args[0] || '/'); break;
+        case 'mkdir': mkdir(args[0]); break;
+        case 'rmdir': rmdir(args[0]); break;
+        case 'rm': rm(args[0]); break;
+        case 'touch': touch(args[0]); break;
+        case 'echo': echo(args); break;
+        case 'cat': cat(args[0]); break;
+        case 'nano': nanoCmd(args[0]); break;
+        case 'cp': cp(args); break;
+        case 'mv': mv(args); break;
+        case 'whoami': whoami(); break;
+        case 'useradd': useradd(args[0]); break;
+        case 'su': su(args[0]); break;
+        case 'clear': clear(); break;
+        case 'help': help(); break;
+        case 'history': showHistory(); break;
+        case 'exit': exit(); break;
+        case 'reset': resetAll(); break;
+        default:
+            outputDiv.innerHTML += `<div><span class="error">Command not found: ${cmd}</span></div>`;
+    }
+    scrollToBottom();
+}
+function ls() {
+    const curr = getCurrentPath();
+    if (!fileSystem[curr] || typeof fileSystem[curr] !== 'object') fileSystem[curr] = {};
+    let entries = listDir(curr);
+    let out = [];
+    Object.keys(entries).sort().forEach(name => {
+        if (entries[name] === 'object') {
+            out.push(`<b style="color:#1efb5b;">${name}/</b>`);
+        } else {
+            out.push(`<span style="color:#faeb52">${name}</span>`);
+        }
+    });
+    outputDiv.innerHTML += `<div><span class="output-text">${out.length ? out.join(' ') : 'No files or directories found.'}</span></div>`;
+}
+function pwd() { outputDiv.innerHTML += `<div><span class="output-text">${getCurrentPath()}</span></div>`; }
+function cd(dir) {
+    if (!dir || dir === '' || dir === '/') { currentDir = []; updatePrompt(); return; }
+    if (dir === '..') { if (currentDir.length > 0) { currentDir.pop(); updatePrompt(); }
+    else outputDiv.innerHTML += `<div><span class="error">cd: already at root</span></div>`; return; }
+    let targetParts = dir.startsWith('/') ? dir.split('/').filter(Boolean) : currentDir.concat(dir.split('/').filter(Boolean));
+    const targetPath = normalizePath(targetParts);
+    if (fileSystem[targetPath] && typeof fileSystem[targetPath] === 'object') {
+        currentDir = targetParts; updatePrompt();
+    } else outputDiv.innerHTML += `<div><span class="error">cd: ${dir}: No such directory</span></div>`;
+}
+function mkdir(dir) {
+    if (!dir) { outputDiv.innerHTML += `<div><span class="error">mkdir: missing operand</span></div>`; return;}
+    const fullPath = normalizePath(currentDir.concat([dir]));
+    if (fileSystem[fullPath]) outputDiv.innerHTML += `<div><span class="error">mkdir: ${dir}: Already exists</span></div>`;
+    else { fileSystem[fullPath] = {}; outputDiv.innerHTML += `<div><span class="output-text">Directory '${dir}' created.</span></div>`; saveFileSystem();}
+}
+function rmdir(dir) {
+    if (!dir) { outputDiv.innerHTML += `<div><span class="error">rmdir: missing operand</span></div>`; return;}
+    const fullPath = normalizePath(currentDir.concat([dir]));
+    if (!fileSystem[fullPath] || typeof fileSystem[fullPath] !== 'object') {
+        outputDiv.innerHTML += `<div><span class="error">rmdir: ${dir}: No such directory</span></div>`; return;}
+    for (let k in fileSystem) if (k !== fullPath && k.startsWith(fullPath + '/')) {
+        outputDiv.innerHTML += `<div><span class="error">rmdir: ${dir}: Directory not empty</span></div>`; return;}
+    delete fileSystem[fullPath]; outputDiv.innerHTML += `<div><span class="output-text">Directory '${dir}' removed.</span></div>`; saveFileSystem();
+}
+function rm(file) {
+    if (!file) { outputDiv.innerHTML += `<div><span class="error">rm: missing operand</span></div>`; return;}
+    const fullPath = normalizePath(currentDir.concat([file]));
+    if (fileSystem[fullPath] && typeof fileSystem[fullPath] === 'string') {
+        delete fileSystem[fullPath]; outputDiv.innerHTML += `<div><span class="output-text">File '${file}' removed.</span></div>`; saveFileSystem();
+    } else outputDiv.innerHTML += `<div><span class="error">rm: ${file}: No such file</span></div>`;
+}
+function touch(file) {
+    if (!file) { outputDiv.innerHTML += `<div><span class="error">touch: missing operand</span></div>`; return;}
+    const curr = getCurrentPath();
+    if (!fileSystem[curr] || typeof fileSystem[curr] !== 'object') fileSystem[curr] = {};
+    const fullPath = normalizePath(currentDir.concat([file]));
+    if (fileSystem[fullPath]) outputDiv.innerHTML += `<div><span class="error">touch: ${file}: File exists</span></div>`;
+    else { fileSystem[fullPath] = ''; outputDiv.innerHTML += `<div><span class="output-text">File '${file}' created.</span></div>`; saveFileSystem();}
+}
+function echo(args) { outputDiv.innerHTML += `<div><span class="output-text">${args.join(' ')}</span></div>`; }
+function cat(file) {
+    if (!file) { outputDiv.innerHTML += `<div><span class="error">cat: missing file operand</span></div>`; return;}
+    const fullPath = normalizePath(currentDir.concat([file]));
+    if (fileSystem[fullPath] && typeof fileSystem[fullPath] === 'string') {
+        let content = fileSystem[fullPath].replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g, '<br>');
+        outputDiv.innerHTML += `<div><span class="output-text">${content}</span></div>`;
+    } else outputDiv.innerHTML += `<div><span class="error">cat: ${file}: No such file</span></div>`;
+}
+function nanoCmd(file) {
+    if (!file) { outputDiv.innerHTML += `<div><span class="error">nano: missing file operand</span></div>`; return;}
+    const fullPath = normalizePath(currentDir.concat([file]));
+    let curr = getCurrentPath();
+    if (!fileSystem[curr] || typeof fileSystem[curr] !== 'object') fileSystem[curr] = {};
+    nanoEditingPath = fullPath;
+    nanoEditingFile = file;
+    nanoFilename.textContent = `nano ${file}`;
+    nanoTextarea.value = (fileSystem[fullPath] && typeof fileSystem[fullPath] === 'string') ? fileSystem[fullPath] : '';
+    nanoModal.style.display = 'flex'; setTimeout(() => nanoTextarea.focus(), 70);
+}
+nanoForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (nanoEditingPath) {
+        let parent = getCurrentPath();
+        if (!fileSystem[parent] || typeof fileSystem[parent] !== 'object') fileSystem[parent] = {};
+        fileSystem[nanoEditingPath] = nanoTextarea.value;
+        outputDiv.innerHTML += `<div><span class="prompt">${currentUser}@web-terminal:${getCurrentPath()}</span> <span class="command">nano ${nanoEditingFile}</span></div>`;
+        outputDiv.innerHTML += `<div><span class="output-text">File '${nanoEditingFile}' saved.</span></div>`;
+        saveFileSystem();
+    }
+    nanoModal.style.display = 'none';
+    nanoEditingPath = null;
+    nanoEditingFile = null;
+    commandInput.focus(); scrollToBottom();
+});
+nanoCancelBtn.addEventListener('click', () => {
+    nanoModal.style.display = 'none';
+    outputDiv.innerHTML += `<div><span class="prompt">${currentUser}@web-terminal:${getCurrentPath()}</span> <span class="command">nano ${nanoEditingFile}</span></div>`;
+    outputDiv.innerHTML += `<div><span class="output-text">[nano] Cancelled. No changes written.</span></div>`;
+    nanoEditingPath = null; nanoEditingFile = null;
+    commandInput.focus(); scrollToBottom();
+});
+nanoTextarea.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ nanoCancelBtn.click(); } });
+function mv(args) {
+    if (args.length < 2) { outputDiv.innerHTML += `<div><span class="error">mv: missing operands</span></div>`; return; }
+    const srcPath = normalizePath(currentDir.concat([args[0]]));
+    let srcName = args[0].split('/').filter(Boolean).pop();
+    if (!fileSystem[srcPath]) {
+        outputDiv.innerHTML += `<div><span class="error">mv: ${args[0]}: No such file or directory</span></div>`;
+        return;
+    }
+    let destArg = args[1];
+    let destParts = destArg.startsWith('/')
+        ? destArg.split('/').filter(Boolean)
+        : currentDir.concat(destArg.split('/').filter(Boolean));
+    let destPath = normalizePath(destParts);
+    let destExists = fileSystem[destPath] !== undefined;
+    let destIsDir = destExists && typeof fileSystem[destPath] === 'object';
+    let destEndsWithSlash = destArg.endsWith('/');
+    if (destExists && destIsDir) {
+        let finalPath = destPath + (destPath === '/' ? '' : '/') + srcName;
+        fileSystem[finalPath] = fileSystem[srcPath];
+        delete fileSystem[srcPath];
+        outputDiv.innerHTML += `<div><span class="output-text">Moved '${args[0]}' to '${destArg + (destArg.endsWith('/') ? '' : '/') + srcName}'.</span></div>`;
+        saveFileSystem();
+        return;
+    }
+    if (destEndsWithSlash) {
+        outputDiv.innerHTML += `<div><span class="error">mv: cannot move to '${args[1]}': No such directory</span></div>`;
+        return;
+    }
+    let destParentParts = destParts.slice(0, -1);
+    let destParentPath = normalizePath(destParentParts);
+    if (destParentPath === '') destParentPath = '/';
+    if (!fileSystem[destParentPath] || typeof fileSystem[destParentPath] !== 'object') {
+        outputDiv.innerHTML += `<div><span class="error">mv: cannot move to '${args[1]}': No such directory</span></div>`;
+        return;
+    }
+    fileSystem[destPath] = fileSystem[srcPath];
+    delete fileSystem[srcPath];
+    outputDiv.innerHTML += `<div><span class="output-text">Moved '${args[0]}' to '${args[1]}'.</span></div>`;
+    saveFileSystem();
+}
+function cp(args) {
+    if (args.length < 2) { outputDiv.innerHTML += `<div><span class="error">cp: missing operands</span></div>`; return; }
+    const srcPath = normalizePath(currentDir.concat([args[0]]));
+    let srcName = args[0].split('/').filter(Boolean).pop();
+    if (!fileSystem[srcPath] || typeof fileSystem[srcPath] !== 'string') {
+        outputDiv.innerHTML += `<div><span class="error">cp: ${args[0]}: No such file</span></div>`; return;
+    }
+    let destArg = args[1];
+    let destParts = destArg.startsWith('/')
+        ? destArg.split('/').filter(Boolean)
+        : currentDir.concat(destArg.split('/').filter(Boolean));
+    let destPath = normalizePath(destParts);
+    let destExists = fileSystem[destPath] !== undefined;
+    let destIsDir = destExists && typeof fileSystem[destPath] === 'object';
+    let destEndsWithSlash = destArg.endsWith('/');
+    if (destExists && destIsDir) {
+        let finalPath = destPath + (destPath === '/' ? '' : '/') + srcName;
+        fileSystem[finalPath] = fileSystem[srcPath];
+        outputDiv.innerHTML += `<div><span class="output-text">Copied '${args[0]}' to '${destArg + (destArg.endsWith('/') ? '' : '/') + srcName}'.</span></div>`;
+        saveFileSystem();
+        return;
+    }
+    if (destEndsWithSlash) {
+        outputDiv.innerHTML += `<div><span class="error">cp: cannot copy to '${args[1]}': No such directory</span></div>`;
+        return;
+    }
+    let destParentParts = destParts.slice(0, -1);
+    let destParentPath = normalizePath(destParentParts);
+    if (destParentPath === '') destParentPath = '/';
+    if (!fileSystem[destParentPath] || typeof fileSystem[destParentPath] !== 'object') {
+        outputDiv.innerHTML += `<div><span class="error">cp: cannot copy to '${args[1]}': No such directory</span></div>`;
+        return;
+    }
+    fileSystem[destPath] = fileSystem[srcPath];
+    outputDiv.innerHTML += `<div><span class="output-text">Copied '${args[0]}' to '${args[1]}'.</span></div>`;
+    saveFileSystem();
+}
+function whoami() { outputDiv.innerHTML += `<div><span class="output-text">${currentUser}</span></div>`; }
+function useradd(username) {
+    if (!username) { outputDiv.innerHTML += `<div><span class="error">useradd: missing username</span></div>`; return; }
+    if (!fileSystem['/users']) fileSystem['/users'] = {};
+    if (fileSystem['/users'][username]) {
+        outputDiv.innerHTML += `<div><span class="error">useradd: User '${username}' already exists.</span></div>`;
+    } else {
+        fileSystem['/users'][username] = {};
+        fileSystem['/home/'+username] = {};
+        outputDiv.innerHTML += `<div><span class="output-text">User '${username}' created. Home: /home/${username}</span></div>`;
+        saveFileSystem();
+    }
+}
+function su(username) {
+    if (!username) { outputDiv.innerHTML += `<div><span class="error">su: missing username</span></div>`; return;}
+    if (fileSystem['/users'] && fileSystem['/users'][username]) {
+        currentUser = username;
+        setUserHomeDir();
+        outputDiv.innerHTML += `<div><span class="output-text">Switched to user '${username}'.</span></div>`;
+        saveFileSystem(); updatePrompt();
+    } else outputDiv.innerHTML += `<div><span class="error">su: user '${username}' does not exist.</span></div>`;
+}
+function clear() { outputDiv.innerHTML = ''; }
+function resetAll() {
+    outputDiv.innerHTML = `<div><span class="output-text">All data deleted. Terminal has been reset.</span></div>`;
+    localStorage.removeItem('webTerminalFS'); localStorage.removeItem('webTerminalHistory'); localStorage.removeItem('webTerminalUser');
+    fileSystem = { "/":{} }; history = []; historyIndex = 0; currentUser = 'user'; currentDir = [];
+    createBaseFilesystem();
+    setUserHomeDir();
+    setTimeout(() => { clear(); updatePrompt(); commandInput.disabled = false; executeBtn.disabled = false; }, 650);
+}
+function help() {
+    const commands = [
+        "ls                   List files and directories",
+        "pwd                  Show current directory",
+        "cd [dir]             Change directory",
+        "mkdir [dir]          Create directory",
+        "rmdir [dir]          Remove empty directory",
+        "rm [file]            Remove file",
+        "touch [file]         Create file",
+        "echo [text]          Display text",
+        "cat [file]           View file content",
+        "nano [file]          Edit/create text file",
+        "cp [src] [dest]      Copy file",
+        "mv [src] [dest]      Move/rename file/dir",
+        "whoami               Show current user",
+        "useradd [username]   Add new user (makes /home/username)",
+        "su [username]        Switch user",
+        "clear                Clear terminal",
+        "history              Show command history",
+        "reset                Delete ALL data, restore system folders",
+        "exit                 Exit terminal",
+        "Help: ESC cancels nano"
+    ];
+    outputDiv.innerHTML += `<div><span class="output-text">${commands.join('<br>')}</span></div>`;
+    scrollToBottom();
+}
+function showHistory() {
+    if (history.length === 0) {
+        outputDiv.innerHTML += `<div><span class="output-text">No command history.</span></div>`;
+    } else {
+        outputDiv.innerHTML += `<div><span class="output-text">Command History:</span></div>`;
+        history.slice(-50).forEach((cmd, idx, arr) => {
+            var actualIdx = history.length - arr.length + idx + 1;
+            outputDiv.innerHTML += `<div><span class="history-item">${actualIdx}. ${cmd}</span></div>`;
+        });
+    }
+    scrollToBottom();
+}
+function exit() { outputDiv.innerHTML += `<div><span class="output-text">Exiting terminal. Goodbye!</span></div>`; commandInput.disabled = true; executeBtn.disabled = true; }
+function addToHistory(command) { history.push(command); if (history.length > 50) history.shift(); saveFileSystem();}
+function execute() {
+    const command = commandInput.value.trim();
+    if (command) {
+        outputDiv.innerHTML += `<div><span class="prompt">${currentUser}@web-terminal:${getCurrentPath()}</span> <span class="command">${command}</span></div>`;
+        addToHistory(command);
+        processCommand(command);
+        commandInput.value = '';
+        historyIndex = history.length;
+    }
+    scrollToBottom();
+}
+commandInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); execute();}
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (history.length && historyIndex > 0) { historyIndex--; commandInput.value = history[historyIndex]; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (historyIndex < history.length - 1) { historyIndex++; commandInput.value = history[historyIndex]; }
+    else { commandInput.value = ''; historyIndex = history.length; } }
+});
+outputDiv.addEventListener('click', function(){
+    if (nanoModal.style.display !== 'flex') commandInput.focus();
+});
+executeBtn.addEventListener('click', execute);
+
+initFileSystem();
+createBaseFilesystem();
+setUserHomeDir();
+updatePrompt();
+scrollToBottom();
+</script>
+</body>
+</html>
